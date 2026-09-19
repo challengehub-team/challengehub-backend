@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 
 import authRoutes from "./routes/authRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
+/* import paymentRoutes from "./routes/paymentRoutes.js"; */
 import examRoutes from "./routes/examRoutes.js";
 
 dotenv.config();
@@ -31,13 +31,14 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 /* 3. ROUTES ARE NOW PLACED SAFELY BELOW THE PARSERS */
 app.use("/api/auth", authRoutes);
 app.use("/api", dashboardRoutes);
-app.use("/api/payment", paymentRoutes);
+/* app.use("/api/payment", paymentRoutes); */
 app.use("/api/exam", examRoutes);
+
 
 /* START SERVER WITH RENDER COMPATIBLE PORT AND HOST */
 // Change this line:
 // To this:
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;;
 
 app.get("/", (req, res) => {
   res.send("Server is running");

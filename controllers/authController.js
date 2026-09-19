@@ -398,34 +398,24 @@ export const deleteAccount = async (req, res) => {
 };
 
 
-
-// Pass an initial count of 0 into the function
-export async function countAllUsers(nextPageToken, currentCount = 0) {
+export async function countAllUsers() {
   try {
-    // Fetch the next batch (up to 1000 users)
-    const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
-    
-    // Add the number of users in this batch to our total
-    const updatedCount = currentCount + listUsersResult.users.length;
+    let totalCount = 0;
+    let nextPageToken;
 
-    // If there is another page, keep going and pass the updated count
-    if (listUsersResult.nextPageToken) {
-      return await countAllUsers(listUsersResult.nextPageToken, updatedCount);
-    } 
+    do {
+      // Fetch up to 1000 users per batch (maximum allowed by Firebase)
+      const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+      
+      totalCount += listUsersResult.users.length;
+      nextPageToken = listUsersResult.nextPageToken;
+      
+    } while (nextPageToken); // Keep going as long as there is another page
+
+    return totalCount; // Returns only the number
     
-    // No more pages left, return the final grand total
-    return updatedCount;
   } catch (error) {
     console.error('Error counting users:', error);
-    throw error;
+    return 0; // Return 0 instead of breaking the app on failure
   }
 }
-
-// Run the function and handle the final total
-countAllUsers()
-  .then((totalUsers) => {
-    console.log(`Total users in Firebase: ${totalUsers}`);
-  })
-  .catch((err) => {
-    console.error('Failed to get total user count:', err);
-  });
