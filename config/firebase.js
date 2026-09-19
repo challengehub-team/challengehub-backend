@@ -1,8 +1,16 @@
 import admin from "firebase-admin";
-import { createRequire } from "module";
+import { readFile } from "fs/promises";
 
-const require = createRequire(import.meta.url);
-const serviceAccount = require("../serviceAccountKey.json");
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // On Render: Read from Environment Variables
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // Locally: Read the local JSON file safely in ES modules
+  const jsonURL = new URL("../serviceAccountKey.json", import.meta.url);
+  serviceAccount = JSON.parse(await readFile(jsonURL, "utf8"));
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
