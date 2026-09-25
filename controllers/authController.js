@@ -42,6 +42,7 @@ export const signup = async (req, res) => {
       role: "student",
       paymentStatus: "paid",
       hasTakenQuiz: false,
+      canTakeChallenge: false,
       state,
       lga,
       school,

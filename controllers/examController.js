@@ -15,10 +15,13 @@ export const startExam = async (req, res) => {
         if (!userQuery.empty) {
             const existingData = userQuery.docs[0].data();
             const currentAttempts = existingData.submissionAttempts || 0;
+            const hasTakenQuiz = existingData.hasTakenQuiz || false;
+            const canTakeChallenge = existingData.canTakeChallenge || false;
 
             // If they have already completed 2 submissions, block them from starting a 3rd time
-            if (currentAttempts >= 2) {
-                return res.status(403).json({ 
+            if (currentAttempts >= 2 && hasTakenQuiz === true) {
+                canTakeChallenge = false; // Ensure they cannot take the challenge again
+                return res.status(403).json({   
                     success: false, 
                     message: "Access denied. You have already submitted this exam twice." 
                 });
@@ -64,8 +67,11 @@ export const submitExam = async (req, res) => {
             docId = existingDoc.id;
 
             const previousAttemptsCount = existingData.submissionAttempts || 1;
+            const hasTakenQuiz = existingData.hasTakenQuiz || false;
+            const canTakeChallenge = existingData.canTakeChallenge || false;
 
-            if (previousAttemptsCount >= 2) {
+            if (previousAttemptsCount >= 2 && existingData.hasTakenQuiz === true) {
+
                 return res.status(403).json({ 
                     success: false, 
                     message: "Access denied. You have already submitted this exam twice." 
@@ -80,6 +86,8 @@ export const submitExam = async (req, res) => {
                 percent,
                 timeUsed, 
                 submissionAttempts: 2, // Marks that they used their second and final attempt
+                hasTakenQuiz: true, // Marks that they have taken the quiz
+                canTakeChallenge: false, // Ensures they cannot take the challenge again
                 updatedAt: new Date(),
             });
 
@@ -93,6 +101,8 @@ export const submitExam = async (req, res) => {
                 percent,
                 timeUsed,
                 submissionAttempts: 1, // First try tracking flag
+                hasTakenQuiz: false, // Marks that they have not taken the quiz yet
+                canTakeChallenge: true, // Allows them to take the challenge
                 createdAt: new Date(),
             });
             docId = docRef.id;
