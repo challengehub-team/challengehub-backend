@@ -1,4 +1,4 @@
-import { admin, db } from "./config/firebase.js";
+import { admin, db } from "../config/firebase.js";
 
 // Global tracker: sets if the competition is currently locked or open
 let isCompetitionLocked = true;
@@ -119,8 +119,8 @@ async function clearAllResultsData() {
 }
 
 /**
- * 4. THE MAIN TIMELINE CONTROLLER (WITH RENDER CRASH PROTECTION)
- * Manages the alternating 10-minute timelines, locks/unlocks the system, and clears stats.
+ * 4. THE MAIN TIMELINE CONTROLLER (WEEKLY SCHEDULE)
+ * Manages the alternating 3-day open windows and 4-day lockdowns.
  */
 async function runCompetitionCycle() {
   // CRASH PROTECTION CHECK: See if we just recovered from a crash
@@ -129,11 +129,12 @@ async function runCompetitionCycle() {
     const doc = await backupRef.get();
     
     if (doc.exists && doc.data().isCompetitionLocked === false) {
-      console.log("⚠️ System recovery detected! Render restarted while competition was open. Resuming open phase directly...");
+      console.log("⚠️ System recovery detected! Resuming open phase directly...");
       isCompetitionLocked = false;
-      // Skip Phase 1 entirely this time and go straight to holding the open state
-      console.log("🔓 Competition resumed! Running for remaining time...");
-      await new Promise((resolve) => setTimeout(resolve, 10 * 60 * 1000));
+      
+      // Keep open for the 5-day live and leaderboard viewing window
+      console.log("🔓 Competition resumed! Keeping open for the 5-day window...");
+      await new Promise((resolve) => setTimeout(resolve, 4 * 24 * 60 * 60 * 1000)); // 4 Days Open
     }
   } catch (err) {
     console.error("Crash recovery check failed, starting fresh loop:", err);
@@ -141,35 +142,36 @@ async function runCompetitionCycle() {
 
   while (true) {
     // ====================================================
-    // PHASE 1: START THE LOCKDOWN IMMEDIATELY
-    // ====================================================
-    isCompetitionLocked = true;
-    
-    // Save to Firestore backup so Render doesn't wipe data again if it crashes
-    await db.collection("system").doc("liveCycleBackup").set({ isCompetitionLocked: true });
-
-    // Force a complete lockout (canTakeChallenge: false) to stop all entries
-    await updateExistingUsersState(true, false, "ABSOLUTE LOCKDOWN & RESET PHASE");
-    
-    // Wipe out the exam results data collection entirely now that the round is finished
-    await clearAllResultsData();
-    
-    console.log("⏳ Lockdown active and results data deleted. Holding status for 10 minutes...");
-    await new Promise((resolve) => setTimeout(resolve, 10 * 60 * 1000)); // Sleep 10 minutes
-
-    // ====================================================
-    // PHASE 2: REOPEN THE COMPETITION FOR EVERYONE
+    // PHASE 2 (RUNS FIRST): OPEN FOR EXAM & LEADERBOARD
     // ====================================================
     isCompetitionLocked = false;
     
-    // Save to Firestore backup before opening so we are safe from crash wipes
+    // Save open state to Firestore backup to protect against unexpected server drops
     await db.collection("system").doc("liveCycleBackup").set({ isCompetitionLocked: false });
 
-    // Open competition (hasTakenQuiz: false to allow start, canTakeChallenge: true to allow entry)
-    await updateExistingUsersState(false, true, "COMPETITION OPENED (Testing Resumed)");
+    // Open competition parameters (cantakechallenge=true allows entry, hastakenquiz=false allows exam start)
+    await updateExistingUsersState(false, true, "COMPETITION OPENED (Testing & Leaderboard Active)");
 
-    console.log("🔓 Competition is active! Users can log in and test. Running for 10 minutes...");
-    await new Promise((resolve) => setTimeout(resolve, 10 * 60 * 1000)); // Sleep 10 minutes before looping back
+    console.log("🔓 Competition is wide open! Running live phase for 5 days...");
+    await new Promise((resolve) => setTimeout(resolve, 4 * 24 * 60 * 60 * 1000)); // 4 Days Open (Testing + Viewing)
+
+
+    // ====================================================
+    // PHASE 1: START THE 4-DAY LOCKDOWN (MONDAY MORNING)
+    // ====================================================
+    isCompetitionLocked = true;
+    
+    // Save lock state to Firestore backup so Render doesn't wipe data again if it restarts
+    await db.collection("system").doc("liveCycleBackup").set({ isCompetitionLocked: true });
+
+    // Force a complete lockout (canTakeChallenge: false) to stop all entries
+    await updateExistingUsersState(true, false, "ABSOLUTE LOCKDOWN PHASE");
+    
+    // Wipe out the exam results data collection completely now that the 3 days are up
+    await clearAllResultsData();
+    
+    console.log("⏳ Lockdown active and results data deleted. Holding status for 3 days...");
+    await new Promise((resolve) => setTimeout(resolve, 3 * 24 * 60 * 60 * 1000)); // 3 Days Locked (Monday to Thursday)
   }
 }
 

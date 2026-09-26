@@ -1,5 +1,5 @@
 import express from "express";
-import { signup, login, getProfile, signOutUser, getUserByUid, updateAccount, deleteAccount, countAllUsers } from "../controllers/authController.js";
+import { signup, login, getProfile, signOutUser, getUserByUid, updateAccount, deleteAccount, countAllUsers, getDynamicOnlineStudentsCount } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -11,5 +11,6 @@ router.post("/user", getUserByUid);
 router.patch("/update", verifyToken, updateAccount);
 router.delete("/delete", verifyToken, deleteAccount);
 router.get("/users", countAllUsers);
+router.get("/live-traffic-counter", getDynamicOnlineStudentsCount);
 
 export default router;

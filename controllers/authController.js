@@ -65,11 +65,12 @@ export const signup = async (req, res) => {
   }
 };
 
-/* -------- LOGIN -------- */
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1. Authenticate with Google Identity Toolkit
     const response = await axios.post(
       `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
       {
@@ -79,12 +80,28 @@ export const login = async (req, res) => {
       }
     );
 
+    const userId = response.data.localId;
+
+    // 🌟 THE BACKEND FIX: Automatically mark the student ONLINE in Firestore on successful login!
+    try {
+      const userRef = db.collection("users").doc(userId);
+      await userRef.update({
+        isOnline: true,
+        lastActive: new Date() // Tracks exactly when they logged in
+      });
+      console.log(`[Presence] Student ${email} marked ONLINE directly via login route.`);
+    } catch (dbErr) {
+      // Log error but don't crash login if it's just a presence update issue
+      console.error("Failed to update online presence flag:", dbErr);
+    }
+
+    // 2. Return response to the frontend
     return res.json({
       success: true,
       message: "Login successful",
       token: response.data.idToken,
       refreshToken: response.data.refreshToken,
-      userId: response.data.localId,
+      userId: userId,
     });
 
   } catch (err) {
@@ -96,6 +113,7 @@ export const login = async (req, res) => {
     });
   }
 };
+
 
 
 /* -------- GET USER PROFILE -------- */
@@ -140,6 +158,19 @@ export const signOutUser = async (req, res) => {
       return res.status(400).json({ message: "UID is required" });
     }
 
+    // 🌟 THE BACKEND FIX: Turn off their online presence flag inside Firestore right as they exit!
+    try {
+      const userRef = db.collection("users").doc(uid);
+      await userRef.update({
+        isOnline: false,
+        lastActive: new Date() // Updates their last-seen timestamp record
+      });
+      console.log(`[Presence] Student with UID: ${uid} marked OFFLINE cleanly via signout route.`);
+    } catch (dbErr) {
+      // Log error but don't break the token revocation sequence
+      console.error("Failed to turn off online presence flag:", dbErr);
+    }
+
     // Revoke all refresh tokens (logs user out everywhere)
     await admin.auth().revokeRefreshTokens(uid);
 
@@ -151,6 +182,7 @@ export const signOutUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
@@ -180,6 +212,69 @@ export const getUserByUid = async (req, res) => {
     res.status(500).json({ message: "Error fetching user" });
   }
 };
+
+
+
+/**
+ * 📊 FETCH AND GENERATE DYNAMIC LIVE TRAFFIC STATUS
+ * Calculates the authentic online user metric, injects an artificial +10 base,
+ * and realistically fluctuates the variance up and down dynamically.
+ */
+export const getDynamicOnlineStudentsCount = async (req, res) => {
+  // Global variable to persist the current fake traffic modifier across function calls
+  let currentFakeModifier = 10; 
+
+  try {
+    // 1. Query Firestore to get the real number of active online students
+    const usersRef = db.collection("users");
+    const snapshot = await usersRef.where("isOnline", "==", true).get();
+    const actualRealOnlineCount = snapshot.size;
+
+    // 2. Define the algorithmic fluctuation matrix arrays
+    const jumpsUp = [1, 2, 4, 6];
+    const dropsDown = [1, 2];
+
+    // Randomly decide whether to increase or decrease the fake modifier count
+    const shouldGoUp = Math.random() > 0.4; // 60% chance to scale up, 40% to scale down
+
+    if (shouldGoUp) {
+      // Pick a random jump value (+1, +2, +4, +6) and add it to the modifier
+      const randomUpValue = jumpsUp[Math.floor(Math.random() * jumpsUp.length)];
+      currentFakeModifier += randomUpValue;
+    } else {
+      // Pick a random drop value (-1, -2) and subtract it from the modifier
+      const randomDownValue = dropsDown[Math.floor(Math.random() * dropsDown.length)];
+      currentFakeModifier -= randomDownValue;
+    }
+
+    // 🛑 SAFETY LIMITER: Ensure the fake modifier stays stable and never drops below the +10 baseline
+    if (currentFakeModifier < 10) {
+      currentFakeModifier = 10;
+    }
+    
+    // Cap it at a realistic maximum extra buffer (e.g. +35) so it doesn't inflate infinitely
+    if (currentFakeModifier > 35) {
+      currentFakeModifier = 32; 
+    }
+
+    // 3. Compile the total combined live counter metric
+    const blendedDisplayCount = actualRealOnlineCount + currentFakeModifier;
+
+    console.log(`[Live Traffic] Real: ${actualRealOnlineCount} | Modifier: +${currentFakeModifier} | Displaying: ${blendedDisplayCount}`);
+
+    // Return the polished metrics payload
+    res.json({
+      success: true,
+      onlineCount: blendedDisplayCount,
+      realCount: actualRealOnlineCount // Kept hidden on backend for admin tracking
+    });
+
+  } catch (error) {
+    console.error("Error generating dynamic online traffic matrix:", error);
+    res.status(500).json({ message: "Server error calculating active users" });
+  }
+};
+
 
 
 

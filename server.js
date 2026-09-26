@@ -3,50 +3,139 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
-// ... your other imports (cors, routes, etc.)
 
 import authRoutes from "./routes/authRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
-/* import paymentRoutes from "./routes/paymentRoutes.js"; */
 import examRoutes from "./routes/examRoutes.js";
+import { getDynamicOnlineStudentsCount } from "./utils/live-counter.js";
+import { setupCommunity } from "./utils/community-server.js";
 
+// Initialize environment variables
 dotenv.config();
+
+// ============================================================
+// EXPRESS APP
+// ============================================================
 
 const app = express();
 
-// 1. ALWAYS ENABLE CORS FIRST
-app.use(cors({
-  origin: ['http://localhost:5174', 'http://localhost:5173'], // Allow both common Vite ports
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', `PATCH`],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// ============================================================
+// HTTP SERVER
+// ============================================================
 
+const httpServer = createServer(app);
 
-// 2. CRITICAL FIX: MOVE PARSERS HERE (ABOVE THE ROUTES)
-// Now your server knows how to read JSON before the request hits your handlers!
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// ============================================================
+// SOCKET.IO
+// ============================================================
 
-/* 3. ROUTES ARE NOW PLACED SAFELY BELOW THE PARSERS */
+const io = new Server(httpServer, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
+    credentials: true,
+    methods: ["GET", "POST"],
+  },
+});
+
+// ============================================================
+// COMMUNITY SOCKET SYSTEM
+// ============================================================
+
+setupCommunity(io);
+
+// ============================================================
+// CORS
+// ============================================================
+
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5174",
+      "http://localhost:5173",
+    ],
+    credentials: true,
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "OPTIONS",
+      "PATCH",
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
+  })
+);
+
+// ============================================================
+// BODY PARSERS
+// ============================================================
+
+app.use(
+  express.json({
+    limit: "10mb",
+  })
+);
+
+app.use(
+  express.urlencoded({
+    limit: "10mb",
+    extended: true,
+  })
+);
+
+// ============================================================
+// API ROUTES
+// ============================================================
+
 app.use("/api/auth", authRoutes);
+
 app.use("/api", dashboardRoutes);
-/* app.use("/api/payment", paymentRoutes); */
+
 app.use("/api/exam", examRoutes);
 
+// ============================================================
+// LIVE TRAFFIC
+// ============================================================
 
-/* START SERVER WITH RENDER COMPATIBLE PORT AND HOST */
-// Change this line:
-// To this:
-const PORT = process.env.PORT;;
+app.get(
+  "/api/live-traffic-counter",
+  getDynamicOnlineStudentsCount
+);
+
+app.get(
+  "/api/live-traffic",
+  getDynamicOnlineStudentsCount
+);
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
 
 app.get("/", (req, res) => {
-  res.send("Server is running");
+  res.send("ChallengeHub server is running");
 });
 
+// ============================================================
+// START SERVER
+// ============================================================
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `ChallengeHub server running on port ${PORT}`
+  );
+
+  console.log(
+    `Socket.IO community running on port ${PORT}`
+  );
 });
 
+export { app, httpServer, io };
 export default app;
