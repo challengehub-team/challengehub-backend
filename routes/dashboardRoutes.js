@@ -25,9 +25,28 @@ router.get("/dashboard", verifyToken, async (req, res) => {
   }
 });
 
+router.get("/profile", verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    const userDoc = await db.collection("users").doc(uid).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Welcome to dashboard",
+      user: userDoc.data(),
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Removed verifyToken entirely for public access
-router.get("/profile", async (req, res) => {
+router.get("/profile-pic", async (req, res) => {
   try {
     // 1. Explicitly grab the email from the URL query parameters (?email=...)
     const email = req.query.email; 
@@ -65,12 +84,9 @@ router.get("/profile", async (req, res) => {
   }
 });
 
-
-
-
 /* router.get("/profile", verifyToken, async (req, res) => {
   try {
-    const uid = req.user.uid;
+    const uid = req.body;
 
     const userDoc = await db.collection("users").doc(uid).get();
 
@@ -79,8 +95,7 @@ router.get("/profile", async (req, res) => {
     }
 
     res.json({
-      message: "Welcome to dashboard",
-      user: userDoc.data(),
+     userData: userDoc 
     });
 
   } catch (err) {
