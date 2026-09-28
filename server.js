@@ -35,6 +35,7 @@ const io = new Server(httpServer, {
       "http://localhost:5173",
       "http://localhost:5174",
       "https://challengehub-testing-5yxs.vercel.app",
+      "https://challengehub-one.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST"],
