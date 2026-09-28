@@ -58,6 +58,7 @@ app.use(
       "http://localhost:5174",
       "http://localhost:5173",
       "https://challengehub-testing-5yxs.vercel.app",
+      "https://challengehub-one.vercel.app",
     ],
     credentials: true,
     methods: [
